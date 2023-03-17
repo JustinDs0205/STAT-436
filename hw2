@@ -1,0 +1,122 @@
+library("tidyverse")
+library("ggplot2")
+library("dplyr")
+library("stringr")
+library("tidyr")
+library("readr")
+library("here")
+library("skimr")
+library("janitor")
+library("lubridate")
+library('shiny')
+library('plotly')
+
+
+credits <- read.csv('/Users/zdliu/Desktop/kaggle/Netflix/credits.csv')
+titles <- read.csv('/Users/zdliu/Desktop/kaggle/Netflix/titles.csv')
+
+titles$genres_new <- str_extract(titles$genres,'[a-z]+')
+new_genres <- titles$genres %>% str_split(', ',n=7,simplify = TRUE)
+new_genres <- data.frame(new_genres)
+titles$genre1 <- str_extract(new_genres$X1,"[a-z]+")
+titles$genre2 <- str_extract(new_genres$X2,"[a-z]+")
+titles$genre3 <- str_extract(new_genres$X3,"[a-z]+")
+titles$genre4 <- str_extract(new_genres$X4,"[a-z]+")
+titles$genre5 <- str_extract(new_genres$X5,"[a-z]+")
+titles$genre6 <- str_extract(new_genres$X6,"[a-z]+")
+titles$genre7 <- str_extract(new_genres$X7,"[a-z]+")
+
+genre1 <- titles %>% group_by(genre1) %>% summarise(count=n()) %>% arrange(desc(count))
+#count the number of every kind of variables afer group_by
+genre2 <- titles %>% group_by(genre2) %>% summarise(count=n()) %>% arrange(desc(count))
+genre3 <- titles %>% group_by(genre3) %>% summarise(count=n()) %>% arrange(desc(count))
+genre4 <- titles %>% group_by(genre4) %>% summarise(count=n()) %>% arrange(desc(count))
+genre5 <- titles %>% group_by(genre5) %>% summarise(count=n()) %>% arrange(desc(count))
+genre6 <- titles %>% group_by(genre6) %>% summarise(count=n()) %>% arrange(desc(count))
+genre7 <- titles %>% group_by(genre7) %>% summarise(count=n()) %>% arrange(desc(count))
+
+titles <- titles %>% mutate(
+  genre1 = fct_explicit_na(genre1),
+  genre2 = fct_explicit_na(genre2),
+  genre3 = fct_explicit_na(genre3),
+  age_certification = fct_explicit_na(age_certification)
+)
+
+genre1 <- pull(titles, genre1) %>%
+  unique() 
+# na.omit()
+genre2 <- pull(titles, genre2) %>%
+  unique() 
+# na.omit()
+genre3 <- pull(titles, genre3) %>%
+  unique() 
+# na.omit()
+age_certification <- pull(titles, age_certification) %>%
+  unique() 
+
+bubbleplot <- function(df){
+  p <-  ggplot(data = df %>% filter(selected), 
+               aes(tmdb_score, imdb_score, color=age_certification)) +
+    geom_point(alpha=0.5) +
+    scale_size(range = c(.1, 24), name="Population (M)")
+  ggplotly(p) %>% style(hoveron = "fill")
+}
+
+scatterplot <- function(df) {
+  p <- ggplot(mapping = aes(tmdb_score, imdb_score,col = age_certification)) +
+    geom_point(data = df %>% filter(selected),  aes(text = title), size = 2, alpha = 1) +
+    geom_point(data = df %>% filter(!selected),  size = .5, alpha = .1)
+  ggplotly(p, tooltip = "Title") %>%
+    style(hoveron = "fill")
+}
+
+ui <- fluidPage(
+  titlePanel("IMDB Analysis"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput("Genres1", "First Genre", genre1),
+      selectInput("Genres2", "Second Genre", genre2),
+      selectInput("Genres3", "Third Genre", genre3),
+      checkboxGroupInput("mpaa", "MPAA Rating", age_certification),
+      sliderInput("year", "Year", min = min(titles$release_year), max = max(titles$release_year), c(1945, 2022), sep = ""),
+      plotlyOutput("ratings_scatter"),
+      plotlyOutput("bubbleplot")
+    ),
+    
+    mainPanel(
+      dataTableOutput("table1")
+    )
+    
+  ))
+
+server <- function(input, output) {
+  titles_subset <- reactive({
+    titles %>%
+      mutate(selected = (
+        (genre1 %in% input$Genres1) &
+          (genre2 %in% input$Genres2) &
+          (genre3 %in% input$Genres3) &
+          (age_certification %in% input$mpaa) &
+          (release_year >= input$year[1]) &
+          (release_year <= input$year[2])
+      )) 
+  })
+  
+  output$bubbleplot <- renderPlotly({
+    bubbleplot(titles_subset())
+  })
+  
+  output$ratings_scatter <- renderPlotly({
+    scatterplot(titles_subset())
+  })
+  
+  output$table1 <- renderDataTable({
+    titles_subset() %>%
+      filter(selected) %>%
+      select(title,imdb_score,tmdb_score,genre1,genre2,age_certification,release_year) %>%
+      arrange(-imdb_score)
+    
+  })
+}
+
+shinyApp(ui, server)
