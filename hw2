@@ -10,10 +10,10 @@ library("janitor")
 library("lubridate")
 library('shiny')
 library('plotly')
+library('rsconnect')
 
-
-credits <- read.csv('/Users/zdliu/Desktop/kaggle/Netflix/credits.csv')
-titles <- read.csv('/Users/zdliu/Desktop/kaggle/Netflix/titles.csv')
+#load the data
+titles <-  read.csv('https://raw.githubusercontent.com/JustinDs0205/STAT-436/main/titles.csv')
 
 titles$genres_new <- str_extract(titles$genres,'[a-z]+')
 new_genres <- titles$genres %>% str_split(', ',n=7,simplify = TRUE)
@@ -77,7 +77,7 @@ ui <- fluidPage(
       selectInput("Genres1", "First Genre", genre1),
       selectInput("Genres2", "Second Genre", genre2),
       selectInput("Genres3", "Third Genre", genre3),
-      checkboxGroupInput("mpaa", "MPAA Rating", age_certification),
+      checkboxGroupInput("mpaa", "MPAA Rating", age_certification,age_certification),
       sliderInput("year", "Year", min = min(titles$release_year), max = max(titles$release_year), c(1945, 2022), sep = ""),
       plotlyOutput("ratings_scatter"),
       plotlyOutput("bubbleplot")
@@ -120,3 +120,4 @@ server <- function(input, output) {
 }
 
 shinyApp(ui, server)
+
